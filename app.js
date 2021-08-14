@@ -32,9 +32,19 @@ const cheerio = require('cheerio');
 // });
 
 
-downloadVideosFromUrlBulk("videos.json", function () {
-    console.log("All downloads finised");
+// downloadVideosFromUrlBulk("videos.json", function () {
+//     console.log("All downloads finised");
+// });
+
+// getStreamServerList("OTAwODM","One%20Piece%20(Dub)%20Episode%20368",function(items){
+//     console.log(items);
+// });
+
+
+getVideoURlsFromStreamani("https://streamani.net/embedplus?id=OTAwODM=&token=6haxdGb2Bzv4FT7nXtZcbA&expires=1628973527",function(video_urls){
+    console.log(video_urls);
 });
+
 
 function getEpisodeList(id, callback) {
     request.get("https://123animes.mobi/ajax/film/servers?id=" + id, function (error, response, body) {
@@ -68,7 +78,35 @@ function getVideoIframeUrl(episode_id, callback) {
         var parsed = new URL("https:" + u);
         var title = parsed.searchParams.get("title");
         var id = parsed.searchParams.get("id");
-        callback("https://gogo-play.net/load.php?id=" + id + "&title=" + title);
+        // callback("https://gogo-play.net/load.php?id=" + id + "&title=" + title);
+        // callback("https://streamani.net/embedplus?id="+ id + "&title=" + title);
+        getStreamServerList(id,title,function(urls){
+            var video_stream_url = "";
+            for(var u of urls){
+                if(u.provider == "Multiquality Server"){
+                    video_stream_url = u.video;
+                }
+            }
+            
+        });
+    });
+}
+
+
+function getStreamServerList(id,title,callback){
+    request.get("https://streamani.net/load.php?id="+id+"=&title="+title,function(error,response,body){
+        const $ = cheerio.load(body);
+        var items = [];
+        $("li.linkserver").each(function () {
+            if($(this).attr("data-video") !== ""){
+                items.push({
+                    provider : $(this).html(),
+                    video : $(this).attr("data-video")
+                });
+            }
+            
+        });
+        callback(items);
     });
 }
 
@@ -200,4 +238,26 @@ function showDownloadingProgress(received, total) {
     var percentage = ((received * 100) / total).toFixed(2);
     process.stdout.write("\033[0G");
     process.stdout.write(percentage + "% | " + received + " bytes downloaded out of " + total + " bytes.");
+}
+
+// STREAM SERVER APIS
+
+
+function getVideoURlsFromStreamani(url,callback){
+    request.get(url,function(error,response,body){
+        var items = [];
+        var code = body.substring(body.indexOf(`<div id="myVideo"></div>`),body.indexOf(`</html>`));
+        code = code.substring(code.indexOf(`<script type="text/JavaScript">`),code.indexOf(`</script>`));
+        code = code.split("{file:");
+        for(var c of code){
+            var url = {};
+            url.video = c.substring(c.indexOf(`'`)+1,c.indexOf(`',`));
+            url.extension = url.video.substring(url.video.lastIndexOf('.')+1,url.video.length);
+            if(url.video !== ""){
+                items.push(url);
+            }
+            
+        }
+       callback(items);
+    });
 }
